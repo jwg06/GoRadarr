@@ -1,0 +1,46 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.html
+coverage.txt
+
+# Go
+vendor/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Data / config
+*.db
+*.db-shm
+*.db-wal
+config.yaml
+config.yml
+
+# Logs
+*.log
+
+# Build artifacts
+dist/
+release/
+
+# Air (hot reload)
+tmp/
