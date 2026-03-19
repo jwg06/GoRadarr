@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,6 +15,17 @@ import (
 )
 
 func main() {
+	// Docker HEALTHCHECK: ./goradarr -healthcheck
+	if len(os.Args) == 2 && os.Args[1] == "-healthcheck" {
+		cfg, _ := config.Load()
+		url := fmt.Sprintf("http://localhost:%d/api/v1/ping", cfg.Port)
+		resp, err := http.Get(url) //nolint:gosec
+		if err != nil || resp.StatusCode != http.StatusOK {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))

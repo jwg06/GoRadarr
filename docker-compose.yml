@@ -1,0 +1,25 @@
+services:
+  goradarr:
+    image: ghcr.io/jwg06/goradarr:latest
+    container_name: goradarr
+    ports:
+      - "7878:7878"
+    volumes:
+      - ./config:/config
+      - /path/to/your/media:/media  # update this path
+    environment:
+      GORADARR_HOST: "0.0.0.0"
+      GORADARR_PORT: "7878"
+      GORADARR_DATABASE_DSN: /config/goradarr.db
+      GORADARR_DATA_ROOT_DIR: /config
+      GORADARR_LOG_LEVEL: info
+      # GORADARR_AUTH_ENABLED: "true"
+      # GORADARR_AUTH_API_KEY: "your-api-key-here"
+      TZ: America/New_York  # update your timezone
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7878/api/v1/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

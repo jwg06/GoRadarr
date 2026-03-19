@@ -1,0 +1,15 @@
+.git
+.github
+bin/
+tmp/
+*.db
+*.db-shm
+*.db-wal
+config.yaml
+config.yml
+frontend/node_modules/
+frontend/dist/
+*.test
+*.out
+coverage*
+docs/
