@@ -95,16 +95,6 @@ func (s *Server) buildRouter() http.Handler {
 		r.Get("/feed", s.broker.ServeHTTP)
 	})
 
-	r.Get("/*", s.spaHandler())
+	r.Handle("/*", spaFS())
 	return r
-}
-
-func (s *Server) spaHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>GoRadarr</title>
-<style>body{font-family:system-ui;background:#0d1117;color:#cdd9e5;padding:2rem}a{color:#79c0ff}code{background:#161b22;padding:.2rem .5rem;border-radius:4px}</style>
-</head><body><h1>\U0001f3ac GoRadarr</h1>
-<p>Backend running. API: <a href="/api/v1/system/status"><code>/api/v1/system/status</code></a></p></body></html>`)
-	}
 }

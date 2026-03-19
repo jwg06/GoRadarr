@@ -8,7 +8,10 @@ LDFLAGS    := -s -w -X main.version=$(VERSION)
 
 all: build
 
-build:
+frontend-copy:
+	@if [ ! -d internal/server/frontend ]; then cp -r frontend/dist internal/server/frontend; fi
+
+build: frontend-copy
 	@mkdir -p $(BUILD_DIR)
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) $(CMD)
 

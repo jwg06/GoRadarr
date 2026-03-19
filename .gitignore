@@ -44,3 +44,5 @@ release/
 
 # Air (hot reload)
 tmp/
+internal/server/frontend/
+frontend/dist/
