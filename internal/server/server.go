@@ -10,21 +10,33 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/jwg06/goradarr/internal/api/v1/calendar"
+	"github.com/jwg06/goradarr/internal/api/v1/downloadclients"
+	"github.com/jwg06/goradarr/internal/api/v1/history"
+	"github.com/jwg06/goradarr/internal/api/v1/indexers"
 	"github.com/jwg06/goradarr/internal/api/v1/movies"
+	"github.com/jwg06/goradarr/internal/api/v1/notifications"
+	"github.com/jwg06/goradarr/internal/api/v1/profiles"
+	"github.com/jwg06/goradarr/internal/api/v1/queue"
 	"github.com/jwg06/goradarr/internal/api/v1/system"
+	"github.com/jwg06/goradarr/internal/api/v1/tags"
+	"github.com/jwg06/goradarr/internal/auth"
 	"github.com/jwg06/goradarr/internal/config"
 	"github.com/jwg06/goradarr/internal/database"
+	"github.com/jwg06/goradarr/internal/events"
 )
 
 type Server struct {
 	cfg    *config.Config
 	db     *database.DB
 	logger *slog.Logger
+	broker *events.Broker
 	http   *http.Server
 }
 
 func New(cfg *config.Config, db *database.DB, logger *slog.Logger) *Server {
-	s := &Server{cfg: cfg, db: db, logger: logger}
+	broker := events.NewBroker(logger)
+	s := &Server{cfg: cfg, db: db, logger: logger, broker: broker}
 	s.http = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Handler:      s.buildRouter(),
@@ -43,10 +55,9 @@ func (s *Server) Run(ctx context.Context) error {
 			errCh <- err
 		}
 	}()
-
 	select {
 	case <-ctx.Done():
-		s.logger.Info("shutting down server...")
+		s.logger.Info("shutting down...")
 		shutCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		return s.http.Shutdown(shutCtx)
@@ -57,36 +68,43 @@ func (s *Server) Run(ctx context.Context) error {
 
 func (s *Server) buildRouter() http.Handler {
 	r := chi.NewRouter()
-
 	r.Use(middleware.RealIP)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Api-Key"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: false,
-		MaxAge:           300,
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-Api-Key"},
+		MaxAge:         300,
 	}))
 
-	// API v1
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(auth.APIKeyMiddleware(s.cfg.Auth.APIKey, s.cfg.Auth.Enabled))
 		movies.RegisterRoutes(r, s.db)
+		profiles.RegisterRoutes(r, s.db)
+		history.RegisterRoutes(r, s.db)
+		calendar.RegisterRoutes(r, s.db)
+		indexers.RegisterRoutes(r, s.db)
+		downloadclients.RegisterRoutes(r, s.db)
+		notifications.RegisterRoutes(r, s.db)
+		queue.RegisterRoutes(r, s.db)
+		tags.RegisterRoutes(r, s.db)
 		system.RegisterRoutes(r, s.cfg, s.db)
+		r.Get("/feed", s.broker.ServeHTTP)
 	})
 
-	// Serve frontend SPA
 	r.Get("/*", s.spaHandler())
-
 	return r
 }
 
 func (s *Server) spaHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, "<!DOCTYPE html><html><head><title>GoRadarr</title></head><body><h1>GoRadarr</h1><p>Frontend coming soon. API available at <a href='/api/v1'>/api/v1</a></p></body></html>")
+		fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>GoRadarr</title>
+<style>body{font-family:system-ui;background:#0d1117;color:#cdd9e5;padding:2rem}a{color:#79c0ff}code{background:#161b22;padding:.2rem .5rem;border-radius:4px}</style>
+</head><body><h1>\U0001f3ac GoRadarr</h1>
+<p>Backend running. API: <a href="/api/v1/system/status"><code>/api/v1/system/status</code></a></p></body></html>`)
 	}
 }
