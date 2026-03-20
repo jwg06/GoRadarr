@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -140,7 +141,86 @@ func (h *handler) testAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) testOne(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	var ix IndexerConfig
+	err := h.db.QueryRowContext(r.Context(), `
+		SELECT id, name, implementation, config_contract, COALESCE(settings,'{}'),
+		       enable_rss, enable_automatic_search, enable_interactive_search, priority, COALESCE(tags,'[]')
+		FROM indexers WHERE id=?`, id).Scan(
+		&ix.ID, &ix.Name, &ix.Implementation, &ix.ConfigContract, &ix.Fields,
+		&ix.EnableRSS, &ix.EnableAutomaticSearch, &ix.EnableInteractiveSearch, &ix.Priority, &ix.Tags)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "indexer not found")
+		return
+	}
+
+	fields := parseIndexerFields(ix.Fields)
+	baseURL := indexerFieldString(fields, "baseUrl")
+	apiKey := indexerFieldString(fields, "apiKey")
+
+	if baseURL == "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"isValid":  false,
+			"failures": []map[string]string{{"errorMessage": "indexer URL not configured"}},
+		})
+		return
+	}
+
+	capsURL := fmt.Sprintf("%s/api?t=caps&apikey=%s", baseURL, url.QueryEscape(apiKey))
+	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, capsURL, nil)
+	nc := NewNewznabClient(baseURL, apiKey)
+	resp, err := nc.client.Do(req)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"isValid":  false,
+			"failures": []map[string]string{{"errorMessage": err.Error()}},
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"isValid":  false,
+			"failures": []map[string]string{{"errorMessage": fmt.Sprintf("indexer returned HTTP %d", resp.StatusCode)}},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"isValid": true, "failures": []any{}})
+}
+
+// parseIndexerFields parses Radarr-style field arrays or plain JSON objects.
+func parseIndexerFields(raw json.RawMessage) map[string]json.RawMessage {
+	var arr []struct {
+		Name  string          `json:"name"`
+		Value json.RawMessage `json:"value"`
+	}
+	if err := json.Unmarshal(raw, &arr); err == nil && len(arr) > 0 {
+		result := make(map[string]json.RawMessage, len(arr))
+		for _, f := range arr {
+			result[f.Name] = f.Value
+		}
+		return result
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err == nil {
+		return obj
+	}
+	return map[string]json.RawMessage{}
+}
+
+func indexerFieldString(fields map[string]json.RawMessage, key string) string {
+	v, ok := fields[key]
+	if !ok {
+		return ""
+	}
+	var s string
+	if err := json.Unmarshal(v, &s); err == nil {
+		return s
+	}
+	return strings.Trim(string(v), `"`)
 }
 
 func (h *handler) schema(w http.ResponseWriter, r *http.Request) {

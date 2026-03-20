@@ -12,7 +12,7 @@ import type {
   SchemaOption,
 } from '../lib/types'
 
-const tabs = ['general', 'quality', 'indexers', 'clients', 'notifications'] as const
+const tabs = ['general', 'quality', 'indexers', 'clients', 'notifications', 'security'] as const
 
 type Tab = (typeof tabs)[number]
 
@@ -30,6 +30,8 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: stri
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<Tab>('general')
+  const [newApiKey, setNewApiKey] = useState<string | null>(null)
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null)
 
   const hostConfig = useQuery<GeneralConfig>({ queryKey: ['host-config'], queryFn: () => api.get('/config/host').then((res) => res.data) })
   const qualityProfiles = useQuery<QualityProfile[]>({ queryKey: ['quality-profiles'], queryFn: () => api.get('/qualityprofile').then((res) => res.data) })
@@ -43,6 +45,17 @@ export default function Settings() {
 
   const saveGeneral = useMutation({
     mutationFn: (payload: Partial<GeneralConfig>) => api.put('/config/host', payload),
+  })
+
+  const regenerateKey = useMutation({
+    mutationFn: () => api.post<{ apiKey: string }>('/auth/apikey/regenerate').then((res) => res.data),
+    onSuccess: (data) => {
+      setNewApiKey(data.apiKey)
+      setApiKeyError(null)
+    },
+    onError: (err: Error) => {
+      setApiKeyError(err.message)
+    },
   })
 
   function submitGeneral(event: FormEvent<HTMLFormElement>) {
@@ -121,6 +134,43 @@ export default function Settings() {
             <div className="grid gap-4 xl:grid-cols-2">
               <div className="space-y-3">{notifications.data?.map((item) => <div key={item.id} className="panel-muted p-4"><p className="font-medium text-gray-100">{item.name}</p><p className="mt-1 text-sm text-gray-500">{item.implementation}</p></div>)}</div>
               <div className="space-y-3">{notificationSchemas.data?.map((item) => <div key={item.implementation} className="panel-muted p-4"><p className="font-medium text-gray-100">{item.implementation}</p><p className="mt-1 text-sm text-gray-500">{item.configContract}</p></div>)}</div>
+            </div>
+          </Section>
+        ) : null}
+
+        {activeTab === 'security' ? (
+          <Section title="Security" subtitle="Manage API access credentials.">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-400">Current API Key</p>
+                <p className="mt-2 font-mono text-sm text-gray-300">
+                  ••••••••••••••••••••••••••••••••
+                </p>
+              </div>
+              {newApiKey ? (
+                <div>
+                  <p className="mb-2 text-sm text-gray-400">New API Key (copy it now)</p>
+                  <div className="flex gap-2">
+                    <input readOnly className="field flex-1 font-mono text-sm" value={newApiKey} />
+                    <button
+                      className="btn-secondary"
+                      onClick={() => navigator.clipboard.writeText(newApiKey)}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {apiKeyError ? (
+                <p className="text-sm text-red-400">{apiKeyError}</p>
+              ) : null}
+              <button
+                className="btn-primary"
+                disabled={regenerateKey.isPending}
+                onClick={() => regenerateKey.mutate()}
+              >
+                {regenerateKey.isPending ? 'Regenerating…' : 'Regenerate API Key'}
+              </button>
             </div>
           </Section>
         ) : null}

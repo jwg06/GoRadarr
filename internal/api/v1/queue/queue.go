@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jwg06/goradarr/internal/database"
+	"github.com/jwg06/goradarr/internal/downloadclient"
 )
 
 type handler struct{ db *database.DB }
@@ -125,7 +126,56 @@ func (h *handler) deleteMany(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) grab(w http.ResponseWriter, r *http.Request) {
-	// TODO: trigger download client grab for this queue item
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	// 1. Load queue item.
+	var downloadURL, protocol string
+	var downloadClientID int64
+	err := h.db.QueryRowContext(r.Context(), `
+		SELECT COALESCE(download_url,''), COALESCE(protocol,''), COALESCE(download_client_id,0)
+		FROM queue_items WHERE id=?`, id).Scan(&downloadURL, &protocol, &downloadClientID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "queue item not found")
+		return
+	}
+	if downloadURL == "" {
+		writeError(w, http.StatusBadRequest, "no download URL for this queue item")
+		return
+	}
+
+	// 2. Load download client config.
+	var implementation string
+	var settings json.RawMessage
+	err = h.db.QueryRowContext(r.Context(),
+		`SELECT implementation, COALESCE(settings,'{}') FROM download_clients WHERE id=?`,
+		downloadClientID).Scan(&implementation, &settings)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "download client not found")
+		return
+	}
+
+	// 3. Build the live client.
+	client, err := downloadclient.Build(implementation, settings)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// 4. Dispatch to the correct protocol.
+	if protocol == "torrent" {
+		err = client.AddTorrent(r.Context(), downloadURL, "")
+	} else {
+		err = client.AddNZB(r.Context(), downloadURL, "")
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// 5. Mark as downloading.
+	h.db.ExecContext(r.Context(),
+		`UPDATE queue_items SET status='downloading', updated_at=CURRENT_TIMESTAMP WHERE id=?`, id)
+
 	w.WriteHeader(http.StatusOK)
 }
 

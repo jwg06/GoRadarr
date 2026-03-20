@@ -19,6 +19,7 @@ import (
 	"github.com/jwg06/goradarr/internal/api/v1/notifications"
 	"github.com/jwg06/goradarr/internal/api/v1/profiles"
 	"github.com/jwg06/goradarr/internal/api/v1/queue"
+	"github.com/jwg06/goradarr/internal/api/v1/release"
 	"github.com/jwg06/goradarr/internal/api/v1/system"
 	"github.com/jwg06/goradarr/internal/api/v1/tags"
 	"github.com/jwg06/goradarr/internal/auth"
@@ -92,6 +93,10 @@ func (s *Server) buildRouter() http.Handler {
 	r.Handle("/docs/*", http.StripPrefix("/docs/", docsFS()))
 	r.Handle("/metrics", metrics.Handler())
 
+	r.Route("/api/v1/auth", func(r chi.Router) {
+		auth.RegisterRoutes(r, s.cfg, s.db)
+	})
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(auth.APIKeyMiddleware(s.cfg.Auth.APIKey, s.cfg.Auth.Enabled))
 		movies.RegisterRoutes(r, s.db, s.cfg)
@@ -102,6 +107,7 @@ func (s *Server) buildRouter() http.Handler {
 		downloadclients.RegisterRoutes(r, s.db)
 		notifications.RegisterRoutes(r, s.db)
 		queue.RegisterRoutes(r, s.db)
+		release.RegisterRoutes(r, s.db)
 		tags.RegisterRoutes(r, s.db)
 		system.RegisterRoutes(r, s.cfg, s.db)
 		command.RegisterRoutes(r, s.db, s.cfg)

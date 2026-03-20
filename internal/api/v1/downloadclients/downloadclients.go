@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jwg06/goradarr/internal/database"
+	"github.com/jwg06/goradarr/internal/downloadclient"
 )
 
 // DownloadClientConfig holds persisted download client settings.
@@ -167,8 +168,36 @@ func (h *handler) delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *handler) testAll(w http.ResponseWriter, r *http.Request)  { writeJSON(w, 200, []any{}) }
-func (h *handler) testOne(w http.ResponseWriter, r *http.Request)  { w.WriteHeader(200) }
+func (h *handler) testAll(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, []any{}) }
+
+func (h *handler) testOne(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	var implementation string
+	var settings json.RawMessage
+	err := h.db.QueryRowContext(r.Context(),
+		`SELECT implementation, COALESCE(settings,'{}') FROM download_clients WHERE id=?`,
+		id).Scan(&implementation, &settings)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "download client not found")
+		return
+	}
+
+	client, err := downloadclient.Build(implementation, settings)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if err := client.TestConnection(r.Context()); err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"isValid":  false,
+			"failures": []map[string]string{{"errorMessage": err.Error()}},
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"isValid": true, "failures": []any{}})
+}
 
 func (h *handler) schema(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, ClientSchemas())

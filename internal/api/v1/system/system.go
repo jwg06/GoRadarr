@@ -26,6 +26,9 @@ func RegisterRoutes(r chi.Router, cfg *config.Config, db *database.DB) {
 		r.Get("/status", h.status)
 		r.Get("/health", h.health)
 		r.Get("/diskspace", h.diskspace)
+		r.Get("/backup", h.listBackups)
+		r.Post("/backup", h.createBackup)
+		r.Delete("/backup/{name}", h.deleteBackup)
 	})
 	r.Route("/config", func(r chi.Router) {
 		r.Get("/host", h.getHostConfig)
@@ -74,8 +77,56 @@ func (h *handler) status(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HealthIssue describes a single health check problem.
+type HealthIssue struct {
+	Source  string `json:"source"`
+	Type    string `json:"type"`
+	Message string `json:"message"`
+	WikiURL string `json:"wikiUrl"`
+}
+
 func (h *handler) health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, []map[string]any{})
+	var issues []HealthIssue
+
+	// Check 1: database reachable
+	if err := h.db.PingContext(r.Context()); err != nil {
+		issues = append(issues, HealthIssue{
+			Source:  "DatabaseMigration",
+			Type:    "error",
+			Message: "Database not available: " + err.Error(),
+		})
+	}
+
+	// Check 2: disk space < 1 GB on data dir
+	if h.cfg.Data.RootDir != "" {
+		var stat syscall.Statfs_t
+		if err := syscall.Statfs(h.cfg.Data.RootDir, &stat); err == nil {
+			free := int64(stat.Bavail) * int64(stat.Bsize)
+			const oneGB = int64(1) << 30
+			if free < oneGB {
+				issues = append(issues, HealthIssue{
+					Source:  "DiskSpace",
+					Type:    "warning",
+					Message: "Less than 1 GB free on data directory",
+				})
+			}
+		}
+	}
+
+	// Check 3: TMDB API key missing
+	if h.cfg.Metadata.TMDBAPIKey == "" {
+		issues = append(issues, HealthIssue{
+			Source:  "MetadataProvider",
+			Type:    "info",
+			Message: "TMDB API key not configured. Metadata features will be limited.",
+		})
+	}
+
+	if issues == nil {
+		writeJSON(w, http.StatusOK, []HealthIssue{})
+		return
+	}
+	writeJSON(w, http.StatusOK, issues)
 }
 
 func (h *handler) diskspace(w http.ResponseWriter, r *http.Request) {
