@@ -12,6 +12,8 @@ type Config struct {
 	Port      int             `mapstructure:"port"`
 	BaseURL   string          `mapstructure:"base_url"`
 	LogLevel  string          `mapstructure:"log_level"`
+	LogTarget string          `mapstructure:"log_target"` // stderr | stdout | file | syslog
+	LogFile   string          `mapstructure:"log_file"`   // path when log_target=file
 	Database  DatabaseConfig  `mapstructure:"database"`
 	Auth      AuthConfig      `mapstructure:"auth"`
 	Data      DataConfig      `mapstructure:"data"`
@@ -52,6 +54,8 @@ func Load() (*Config, error) {
 	v.SetDefault("port", 7878)
 	v.SetDefault("base_url", "")
 	v.SetDefault("log_level", "info")
+	v.SetDefault("log_target", "stderr")
+	v.SetDefault("log_file", defaultDataDir("goradarr.log"))
 	v.SetDefault("database.driver", "sqlite")
 	v.SetDefault("database.dsn", defaultDataDir("goradarr.db"))
 	v.SetDefault("auth.enabled", false)

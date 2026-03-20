@@ -1,0 +1,68 @@
+version: 2
+project_name: goradarr
+before:
+  hooks:
+    - go mod tidy
+    - sh -c "cd frontend && npm ci && npm run build && cp -R dist ../internal/server/frontend"
+builds:
+  - id: goradarr
+    main: ./cmd/goradarr
+    binary: goradarr
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    ignore:
+      - goos: windows
+        goarch: arm64
+archives:
+  - id: goradarr
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - CHANGELOG.md
+      - LICENSE
+checksum:
+  name_template: "checksums.txt"
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+release:
+  github:
+    owner: jwg06
+    name: GoRadarr
+  draft: false
+  prerelease: auto
+  name_template: "GoRadarr {{.Version}}"
+dockers:
+  - image_templates:
+      - "ghcr.io/jwg06/goradarr:{{ .Tag }}-amd64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - --platform=linux/amd64
+  - image_templates:
+      - "ghcr.io/jwg06/goradarr:{{ .Tag }}-arm64"
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - --platform=linux/arm64
+docker_manifests:
+  - name_template: "ghcr.io/jwg06/goradarr:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/jwg06/goradarr:{{ .Tag }}-amd64"
+      - "ghcr.io/jwg06/goradarr:{{ .Tag }}-arm64"
+  - name_template: "ghcr.io/jwg06/goradarr:latest"
+    image_templates:
+      - "ghcr.io/jwg06/goradarr:{{ .Tag }}-amd64"
+      - "ghcr.io/jwg06/goradarr:{{ .Tag }}-arm64"

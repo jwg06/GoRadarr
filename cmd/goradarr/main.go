@@ -12,6 +12,7 @@ import (
 	"github.com/jwg06/goradarr/internal/config"
 	sched "github.com/jwg06/goradarr/internal/core/scheduler"
 	"github.com/jwg06/goradarr/internal/database"
+	"github.com/jwg06/goradarr/internal/logging"
 	"github.com/jwg06/goradarr/internal/server"
 )
 
@@ -26,14 +27,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	slog.SetDefault(logger)
-
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
+
+	logger := logging.Setup(cfg.LogLevel, cfg.LogTarget, cfg.LogFile)
+	slog.SetDefault(logger)
 
 	db, err := database.Open(cfg.Database)
 	if err != nil {

@@ -63,3 +63,14 @@ clean:
 
 docker:
 	docker build -t goradarr:$(VERSION) .
+
+tag: ## Create and push a git tag (usage: make tag VERSION=0.2.0)
+	@test -n "$(VERSION)" || (echo "Usage: make tag VERSION=x.y.z" && exit 1)
+	git tag -a v$(VERSION) -m "Release v$(VERSION)"
+	git push origin v$(VERSION)
+
+smoke: ## Run smoke test against local binary
+	./scripts/smoke_test.sh
+
+changelog: ## Show unreleased changes
+	@grep -A 9999 "## \[Unreleased\]" CHANGELOG.md | tail -n +2 | head -n $$(grep -n "^## \[" CHANGELOG.md | sed -n '2p' | cut -d: -f1) | head -n -1
