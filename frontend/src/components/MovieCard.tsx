@@ -1,86 +1,47 @@
-import { clsx } from 'clsx';
-import { CheckCircle, Download, XCircle, Eye, EyeOff } from 'lucide-react';
-import type { Movie } from '../lib/types';
+import { CheckCircle2, CircleDot, Eye, EyeOff, Sparkles } from 'lucide-react'
+import { clsx } from 'clsx'
+import type { Movie } from '../lib/types'
 
-interface Props {
-  movie: Movie;
-  onClick?: () => void;
-}
+export default function MovieCard({ movie, action }: { movie: Movie; action?: React.ReactNode }) {
+  const badge = movie.hasFile
+    ? { label: 'Available', className: 'bg-green-500/15 text-green-300', icon: CheckCircle2 }
+    : movie.monitored
+      ? { label: 'Monitored', className: 'bg-blue-500/15 text-blue-300', icon: CircleDot }
+      : { label: 'Paused', className: 'bg-gray-700 text-gray-300', icon: EyeOff }
+  const BadgeIcon = badge.icon
 
-function StatusBadge({ movie }: { movie: Movie }) {
-  if (movie.hasFile) {
-    return (
-      <span className="flex items-center gap-1 bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full">
-        <CheckCircle size={10} /> Downloaded
-      </span>
-    );
-  }
-  if (movie.monitored) {
-    return (
-      <span className="flex items-center gap-1 bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full">
-        <Download size={10} /> Monitored
-      </span>
-    );
-  }
   return (
-    <span className="flex items-center gap-1 bg-gray-600/40 text-gray-400 text-xs px-2 py-0.5 rounded-full">
-      <XCircle size={10} /> Unmonitored
-    </span>
-  );
-}
-
-export default function MovieCard({ movie, onClick }: Props) {
-  return (
-    <div
-      onClick={onClick}
-      className={clsx(
-        'group bg-gray-900 rounded-lg overflow-hidden border border-gray-800',
-        'hover:border-yellow-400/50 hover:shadow-lg hover:shadow-yellow-400/5',
-        'transition-all duration-200 cursor-pointer'
-      )}
-    >
-      {/* Poster */}
-      <div className="relative aspect-[2/3] bg-gray-800 overflow-hidden">
+    <article className="panel group overflow-hidden transition hover:border-yellow-400/40 hover:shadow-lg hover:shadow-yellow-400/5">
+      <div className="relative aspect-[2/3] bg-gray-800">
         {movie.remotePoster ? (
-          <img
-            src={movie.remotePoster}
-            alt={movie.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
-          />
+          <img src={movie.remotePoster} alt={movie.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-gray-600 text-4xl font-bold">
-              {movie.title.charAt(0)}
-            </span>
+          <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-gray-700">{movie.title[0]}</div>
+        )}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-4 pb-4 pt-10">
+          <div className="flex items-center justify-between gap-3">
+            <span className="rounded-full bg-black/50 px-2 py-1 text-xs text-gray-200">{movie.year || 'TBD'}</span>
+            <div className="flex items-center gap-2 text-xs text-gray-300">
+              {movie.monitored ? <Eye size={13} className="text-yellow-400" /> : <EyeOff size={13} />}
+              {movie.ratings?.value ? <span className="flex items-center gap-1"><Sparkles size={12} className="text-yellow-400" />{movie.ratings.value.toFixed(1)}</span> : null}
+            </div>
           </div>
-        )}
-
-        {/* Monitored indicator */}
-        <div className="absolute top-2 right-2">
-          {movie.monitored ? (
-            <Eye size={14} className="text-yellow-400 drop-shadow" />
-          ) : (
-            <EyeOff size={14} className="text-gray-500" />
-          )}
-        </div>
-
-        {/* Year overlay */}
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1">
-          <span className="text-xs text-gray-300">{movie.year}</span>
         </div>
       </div>
-
-      {/* Info */}
-      <div className="p-2 space-y-1.5">
-        <h3 className="text-sm font-medium text-gray-100 truncate leading-tight" title={movie.title}>
-          {movie.title}
-        </h3>
-        <StatusBadge movie={movie} />
-        {movie.genres && movie.genres.length > 0 && (
-          <p className="text-xs text-gray-500 truncate">{movie.genres.slice(0, 2).join(', ')}</p>
-        )}
+      <div className="space-y-3 p-4">
+        <div>
+          <h3 className="line-clamp-1 text-sm font-semibold text-gray-100">{movie.title}</h3>
+          <p className="mt-1 line-clamp-2 text-xs text-gray-500">{movie.overview || 'Metadata will populate after the first refresh.'}</p>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className={clsx('inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium', badge.className)}>
+            <BadgeIcon size={12} />
+            {badge.label}
+          </span>
+          <span className="text-xs text-gray-500">Q{movie.qualityProfileId}</span>
+        </div>
+        {action ? <div>{action}</div> : null}
       </div>
-    </div>
-  );
+    </article>
+  )
 }

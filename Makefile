@@ -4,14 +4,16 @@ CMD        := ./cmd/goradarr
 VERSION    := $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.1.0-dev")
 LDFLAGS    := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build run test lint clean release fmt tidy frontend dev
+.PHONY: all build run test go-test frontend-test lint clean release fmt tidy frontend docker
 
 all: build
 
-frontend-copy:
-	@if [ ! -d internal/server/frontend ]; then cp -r frontend/dist internal/server/frontend; fi
+frontend:
+	cd frontend && npm ci && npm run build && npm run lint && npm run test:run
+	rm -rf internal/server/frontend
+	cp -R frontend/dist internal/server/frontend
 
-build: frontend-copy
+build: frontend
 	@mkdir -p $(BUILD_DIR)
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) $(CMD)
 
@@ -22,12 +24,18 @@ dev:
 	@which air > /dev/null 2>&1 || go install github.com/air-verse/air@latest
 	air
 
-test:
-	go test ./... -race -cover
+go-test:
+	go test ./cmd/... ./internal/... -race -cover
+
+frontend-test:
+	cd frontend && npm run test:run
+
+test: go-test frontend-test
 
 lint:
 	@which golangci-lint > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run
+	cd frontend && npm run lint
 
 fmt:
 	gofmt -s -w .
@@ -35,9 +43,6 @@ fmt:
 
 tidy:
 	go mod tidy
-
-frontend:
-	cd frontend && npm install && npm run build
 
 release: tidy frontend
 	CGO_ENABLED=0 GOOS=linux   GOARCH=amd64  go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-amd64 $(CMD)
@@ -49,6 +54,7 @@ release: tidy frontend
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -rf frontend/dist
+	rm -rf internal/server/frontend
 
 docker:
 	docker build -t goradarr:$(VERSION) .

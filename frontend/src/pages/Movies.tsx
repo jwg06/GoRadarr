@@ -1,123 +1,123 @@
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Search, SlidersHorizontal } from 'lucide-react';
-import api from '../lib/api';
-import type { Movie } from '../lib/types';
-import MovieCard from '../components/MovieCard';
-
-type Filter = 'all' | 'monitored' | 'unmonitored' | 'downloaded' | 'missing';
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Search, SlidersHorizontal } from 'lucide-react'
+import MovieCard from '../components/MovieCard'
+import api from '../lib/api'
+import type { Movie, QualityProfile } from '../lib/types'
 
 export default function Movies() {
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('')
+  const [stateFilter, setStateFilter] = useState<'all' | 'monitored' | 'unmonitored' | 'downloaded' | 'missing'>('all')
+  const [profileFilter, setProfileFilter] = useState('all')
 
   const { data: movies = [], isLoading, error } = useQuery<Movie[]>({
     queryKey: ['movies'],
-    queryFn: () => api.get('/movie').then((r) => r.data),
-  });
+    queryFn: () => api.get('/movie').then((res) => res.data),
+  })
+
+  const { data: profiles = [] } = useQuery<QualityProfile[]>({
+    queryKey: ['quality-profiles'],
+    queryFn: () => api.get('/qualityprofile').then((res) => res.data),
+  })
 
   const filtered = useMemo(() => {
-    let list = movies;
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((m) => m.title.toLowerCase().includes(q) || String(m.year).includes(q));
-    }
-    switch (filter) {
-      case 'monitored': return list.filter((m) => m.monitored);
-      case 'unmonitored': return list.filter((m) => !m.monitored);
-      case 'downloaded': return list.filter((m) => m.hasFile);
-      case 'missing': return list.filter((m) => m.monitored && !m.hasFile);
-      default: return list;
-    }
-  }, [movies, search, filter]);
+    return movies.filter((movie) => {
+      const matchesSearch = !search || [movie.title, movie.overview, String(movie.year)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(search.toLowerCase())
 
-  const filterButtons: { value: Filter; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'monitored', label: 'Monitored' },
-    { value: 'unmonitored', label: 'Unmonitored' },
-    { value: 'downloaded', label: 'Downloaded' },
-    { value: 'missing', label: 'Missing' },
-  ];
+      const matchesState = (() => {
+        switch (stateFilter) {
+          case 'monitored': return movie.monitored
+          case 'unmonitored': return !movie.monitored
+          case 'downloaded': return movie.hasFile
+          case 'missing': return movie.monitored && !movie.hasFile
+          default: return true
+        }
+      })()
+
+      const matchesProfile = profileFilter === 'all' || String(movie.qualityProfileId) === profileFilter
+      return matchesSearch && matchesState && matchesProfile
+    })
+  }, [movies, profileFilter, search, stateFilter])
+
+  const stats = {
+    total: movies.length,
+    monitored: movies.filter((movie) => movie.monitored).length,
+    available: movies.filter((movie) => movie.hasFile).length,
+    missing: movies.filter((movie) => movie.monitored && !movie.hasFile).length,
+  }
 
   return (
-    <div className="p-4 md:p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-100">Movies</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{movies.length} total</p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <section className="grid gap-4 md:grid-cols-4">
+        {[
+          ['Total Movies', stats.total],
+          ['Monitored', stats.monitored],
+          ['Available', stats.available],
+          ['Wanted', stats.missing],
+        ].map(([label, value]) => (
+          <div key={label} className="panel p-5">
+            <p className="text-sm text-gray-400">{label}</p>
+            <p className="stat-value mt-2">{value}</p>
+          </div>
+        ))}
+      </section>
 
-      {/* Filter bar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search movies..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-yellow-400/50 transition-colors"
-          />
+      <section className="panel p-4 md:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search title, year, or overview"
+              className="field pl-9"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 px-2 text-sm text-gray-500">
+              <SlidersHorizontal size={14} />
+              Filters
+            </span>
+            {(['all', 'monitored', 'unmonitored', 'downloaded', 'missing'] as const).map((value) => (
+              <button
+                key={value}
+                onClick={() => setStateFilter(value)}
+                className={stateFilter === value ? 'btn-primary px-3 py-2' : 'btn-secondary px-3 py-2'}
+              >
+                {value[0].toUpperCase() + value.slice(1)}
+              </button>
+            ))}
+            <select className="field min-w-44" value={profileFilter} onChange={(event) => setProfileFilter(event.target.value)}>
+              <option value="all">All quality profiles</option>
+              {profiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>{profile.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
+      </section>
 
-        {/* Filter pills */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <SlidersHorizontal size={14} className="text-gray-500 mr-1" />
-          {filterButtons.map((btn) => (
-            <button
-              key={btn.value}
-              onClick={() => setFilter(btn.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filter === btn.value
-                  ? 'bg-yellow-400 text-gray-900'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
-              }`}
-            >
-              {btn.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {error ? <div className="panel p-6 text-sm text-red-300">{(error as Error).message}</div> : null}
 
-      {/* Content */}
-      {isLoading && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 animate-pulse">
-              <div className="aspect-[2/3] bg-gray-800" />
-              <div className="p-2 space-y-2">
-                <div className="h-3 bg-gray-800 rounded w-3/4" />
-                <div className="h-3 bg-gray-800 rounded w-1/2" />
-              </div>
-            </div>
-          ))}
+      {isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, index) => <div key={index} className="panel aspect-[0.72] animate-pulse bg-gray-900/40" />)}
         </div>
-      )}
+      ) : null}
 
-      {error && (
-        <div className="text-center py-20 text-red-400">
-          <p className="text-lg font-medium">Failed to load movies</p>
-          <p className="text-sm mt-1 text-gray-500">Check that the backend is running on port 7878</p>
-        </div>
-      )}
+      {!isLoading && filtered.length === 0 ? (
+        <div className="panel p-10 text-center text-gray-400">No movies match the current filters.</div>
+      ) : null}
 
-      {!isLoading && !error && filtered.length === 0 && (
-        <div className="text-center py-20 text-gray-500">
-          <p className="text-lg">No movies found</p>
-          <p className="text-sm mt-1">Try adjusting your filters or adding movies</p>
-        </div>
-      )}
-
-      {!isLoading && !error && filtered.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {filtered.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} />
-          ))}
-        </div>
-      )}
+      {!isLoading && filtered.length > 0 ? (
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {filtered.map((movie) => <MovieCard key={movie.id || movie.tmdbId} movie={movie} />)}
+        </section>
+      ) : null}
     </div>
-  );
+  )
 }

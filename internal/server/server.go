@@ -36,6 +36,7 @@ type Server struct {
 
 func New(cfg *config.Config, db *database.DB, logger *slog.Logger) *Server {
 	broker := events.NewBroker(logger)
+	events.SetDefaultBroker(broker)
 	s := &Server{cfg: cfg, db: db, logger: logger, broker: broker}
 	s.http = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
@@ -82,7 +83,7 @@ func (s *Server) buildRouter() http.Handler {
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(auth.APIKeyMiddleware(s.cfg.Auth.APIKey, s.cfg.Auth.Enabled))
-		movies.RegisterRoutes(r, s.db)
+		movies.RegisterRoutes(r, s.db, s.cfg)
 		profiles.RegisterRoutes(r, s.db)
 		history.RegisterRoutes(r, s.db)
 		calendar.RegisterRoutes(r, s.db)

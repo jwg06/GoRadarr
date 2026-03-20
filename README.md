@@ -96,20 +96,20 @@ GoRadarr/
 - [x] REST API (v3 compatible)
 - [x] SQLite + PostgreSQL support
 - [x] Quality profiles
-- [ ] TMDB metadata integration
+- [x] TMDB-backed movie lookup
 - [ ] Indexer support (Newznab, Torznab)
 - [ ] Download client integrations (qBittorrent, SABnzbd, NZBGet, Deluge, rTorrent)
 - [ ] Automatic search & grab
-- [ ] File management & renaming
+- [x] File management scanning + matching foundation
 - [ ] Custom formats
-- [ ] Calendar view
+- [x] Calendar view
 - [ ] History tracking
 - [ ] Notifications (Discord, Slack, email, Webhook)
 - [ ] Authentication
-- [ ] Real-time updates via SSE
-- [ ] React frontend
+- [x] Real-time updates via SSE
+- [x] React frontend
 - [ ] Auto-updater
-- [ ] Docker image
+- [x] Docker image
 
 ## Development
 
