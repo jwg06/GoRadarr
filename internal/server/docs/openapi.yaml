@@ -1,0 +1,488 @@
+openapi: 3.0.3
+info:
+  title: GoRadarr API
+  version: 0.1.0
+  description: |
+    GoRadarr REST API with Radarr-inspired endpoints for movies, queue, integrations,
+    system status, and configuration. Swagger UI is available at `/docs/`.
+servers:
+  - url: /
+tags:
+  - name: Movies
+  - name: Calendar
+  - name: History
+  - name: Quality
+  - name: Indexers
+  - name: Download Clients
+  - name: Notifications
+  - name: Queue
+  - name: Tags
+  - name: System
+paths:
+  /api/v1/ping:
+    get:
+      tags: [System]
+      summary: Ping the API
+      responses:
+        '200':
+          description: Pong
+  /api/v1/movie:
+    get:
+      tags: [Movies]
+      summary: List movies
+      responses:
+        '200':
+          description: Movies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Movie'
+    post:
+      tags: [Movies]
+      summary: Add a movie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovieCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movie'
+  /api/v1/movie/lookup:
+    get:
+      tags: [Movies]
+      summary: Search TMDB for a movie
+      parameters:
+        - in: query
+          name: term
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Movie'
+  /api/v1/movie/{id}:
+    get:
+      tags: [Movies]
+      summary: Get a movie
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Movie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movie'
+    put:
+      tags: [Movies]
+      summary: Update a movie
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovieCreate'
+      responses:
+        '200':
+          description: Updated movie
+    delete:
+      tags: [Movies]
+      summary: Delete a movie
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Deleted
+  /api/v1/movie/{id}/command:
+    post:
+      tags: [Movies]
+      summary: Trigger a movie command
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '202':
+          description: Accepted
+  /api/v1/calendar:
+    get:
+      tags: [Calendar]
+      summary: Calendar events for release dates
+      parameters:
+        - in: query
+          name: start
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: unmonitored
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Calendar movie list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Movie'
+  /api/v1/history:
+    get:
+      tags: [History]
+      summary: Paginated history records
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: History response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+  /api/v1/qualityprofile:
+    get:
+      tags: [Quality]
+      summary: List quality profiles
+      responses:
+        '200':
+          description: Quality profiles
+    post:
+      tags: [Quality]
+      summary: Create quality profile
+      responses:
+        '201':
+          description: Created
+  /api/v1/qualitydefinition:
+    get:
+      tags: [Quality]
+      summary: List quality definitions
+      responses:
+        '200':
+          description: Quality definitions
+  /api/v1/indexer:
+    get:
+      tags: [Indexers]
+      summary: List indexers
+      responses:
+        '200':
+          description: Indexers
+    post:
+      tags: [Indexers]
+      summary: Create indexer
+      responses:
+        '201':
+          description: Created
+  /api/v1/indexer/schema:
+    get:
+      tags: [Indexers]
+      summary: List indexer schemas
+      responses:
+        '200':
+          description: Schema templates
+  /api/v1/downloadclient:
+    get:
+      tags: [Download Clients]
+      summary: List download clients
+      responses:
+        '200':
+          description: Download clients
+    post:
+      tags: [Download Clients]
+      summary: Create download client
+      responses:
+        '201':
+          description: Created
+  /api/v1/downloadclient/schema:
+    get:
+      tags: [Download Clients]
+      summary: List download client schemas
+      responses:
+        '200':
+          description: Schema templates
+  /api/v1/notification:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      responses:
+        '200':
+          description: Notifications
+    post:
+      tags: [Notifications]
+      summary: Create notification
+      responses:
+        '201':
+          description: Created
+  /api/v1/notification/schema:
+    get:
+      tags: [Notifications]
+      summary: List notification schemas
+      responses:
+        '200':
+          description: Schema templates
+  /api/v1/queue:
+    get:
+      tags: [Queue]
+      summary: List queue records
+      responses:
+        '200':
+          description: Queue response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueResponse'
+    delete:
+      tags: [Queue]
+      summary: Delete multiple queue items
+      responses:
+        '200':
+          description: Deleted
+  /api/v1/queue/status:
+    get:
+      tags: [Queue]
+      summary: Queue summary counts
+      responses:
+        '200':
+          description: Queue status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStatus'
+  /api/v1/queue/{id}:
+    delete:
+      tags: [Queue]
+      summary: Delete a queue item
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Deleted
+  /api/v1/queue/{id}/grab:
+    put:
+      tags: [Queue]
+      summary: Retry or grab queue item
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Grab triggered
+  /api/v1/tag:
+    get:
+      tags: [Tags]
+      summary: List tags
+      responses:
+        '200':
+          description: Tags
+  /api/v1/system/status:
+    get:
+      tags: [System]
+      summary: System runtime status
+      responses:
+        '200':
+          description: System status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatus'
+  /api/v1/system/health:
+    get:
+      tags: [System]
+      summary: Health issues list
+      responses:
+        '200':
+          description: Health response
+  /api/v1/system/diskspace:
+    get:
+      tags: [System]
+      summary: Disk space entries
+      responses:
+        '200':
+          description: Disk usage
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiskSpace'
+  /api/v1/config/host:
+    get:
+      tags: [System]
+      summary: Host configuration
+      responses:
+        '200':
+          description: Host config
+    put:
+      tags: [System]
+      summary: Update host configuration
+      responses:
+        '200':
+          description: Updated host config
+  /api/v1/config/ui:
+    get:
+      tags: [System]
+      summary: UI configuration
+      responses:
+        '200':
+          description: UI config
+    put:
+      tags: [System]
+      summary: Update UI configuration
+      responses:
+        '200':
+          description: Updated UI config
+  /api/v1/feed:
+    get:
+      tags: [System]
+      summary: Server-Sent Events feed
+      responses:
+        '200':
+          description: text/event-stream feed
+components:
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+  schemas:
+    Movie:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        sortTitle: { type: string }
+        tmdbId: { type: integer }
+        imdbId: { type: string }
+        overview: { type: string }
+        status: { type: string }
+        year: { type: integer }
+        runtime: { type: integer }
+        studio: { type: string }
+        qualityProfileId: { type: integer }
+        rootFolderPath: { type: string }
+        path: { type: string }
+        monitored: { type: boolean }
+        minimumAvailability: { type: string }
+        hasFile: { type: boolean }
+        added: { type: string, format: date-time }
+        inCinemas: { type: string, format: date-time }
+        physicalRelease: { type: string, format: date-time }
+        digitalRelease: { type: string, format: date-time }
+        remotePoster: { type: string }
+    MovieCreate:
+      type: object
+      required: [title, tmdbId]
+      properties:
+        title: { type: string }
+        sortTitle: { type: string }
+        tmdbId: { type: integer }
+        overview: { type: string }
+        status: { type: string }
+        year: { type: integer }
+        runtime: { type: integer }
+        studio: { type: string }
+        qualityProfileId: { type: integer }
+        rootFolderPath: { type: string }
+        path: { type: string }
+        monitored: { type: boolean }
+        minimumAvailability: { type: string }
+        inCinemas: { type: string, format: date-time }
+        digitalRelease: { type: string, format: date-time }
+        physicalRelease: { type: string, format: date-time }
+    HistoryResponse:
+      type: object
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalRecords: { type: integer }
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              movieId: { type: integer }
+              sourceTitle: { type: string }
+              eventType: { type: string }
+              date: { type: string, format: date-time }
+    QueueRecord:
+      type: object
+      properties:
+        id: { type: integer }
+        movieId: { type: integer }
+        title: { type: string }
+        size: { type: integer }
+        sizeleft: { type: integer }
+        status: { type: string }
+        trackedDownloadStatus: { type: string }
+        trackedDownloadState: { type: string }
+        downloadId: { type: string }
+        protocol: { type: string }
+        downloadClient: { type: string }
+    QueueResponse:
+      type: object
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalRecords: { type: integer }
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueRecord'
+    QueueStatus:
+      type: object
+      properties:
+        totalCount: { type: integer }
+        count: { type: integer }
+        warnings: { type: boolean }
+        errors: { type: boolean }
+    SystemStatus:
+      type: object
+      properties:
+        version: { type: string }
+        buildTime: { type: string, format: date-time }
+        appData: { type: string }
+        startupPath: { type: string }
+        osName: { type: string }
+        osVersion: { type: string }
+        branch: { type: string }
+        authentication: { type: string }
+        sqliteVersion: { type: string }
+        urlBase: { type: string }
+        runtimeVersion: { type: string }
+        runtimeName: { type: string }
+        startTime: { type: string, format: date-time }
+    DiskSpace:
+      type: object
+      properties:
+        path: { type: string }
+        label: { type: string }
+        freeSpace: { type: integer }
+        totalSpace: { type: integer }

@@ -4,14 +4,19 @@ CMD        := ./cmd/goradarr
 VERSION    := $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.1.0-dev")
 LDFLAGS    := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build run test go-test frontend-test lint clean release fmt tidy frontend docker
+.PHONY: all build run test go-test frontend-assets frontend-check lint clean release fmt tidy frontend docker
 
 all: build
 
-frontend:
-	cd frontend && npm ci && npm run build && npm run lint && npm run test:run
+frontend-assets:
+	cd frontend && npm ci && npm run build
 	rm -rf internal/server/frontend
 	cp -R frontend/dist internal/server/frontend
+
+frontend-check:
+	cd frontend && npm run lint && npm run test:run
+
+frontend: frontend-assets frontend-check
 
 build: frontend
 	@mkdir -p $(BUILD_DIR)
@@ -24,13 +29,13 @@ dev:
 	@which air > /dev/null 2>&1 || go install github.com/air-verse/air@latest
 	air
 
-go-test:
+go-test: frontend-assets
 	go test ./cmd/... ./internal/... -race -cover
 
 frontend-test:
 	cd frontend && npm run test:run
 
-test: go-test frontend-test
+test: go-test frontend-check
 
 lint:
 	@which golangci-lint > /dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest

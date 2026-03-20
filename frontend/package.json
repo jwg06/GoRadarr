@@ -39,6 +39,7 @@
     "globals": "^17.4.0",
     "jsdom": "^27.1.0",
     "postcss": "^8.5.8",
+    "swagger-ui-dist": "^5.32.1",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.57.0",

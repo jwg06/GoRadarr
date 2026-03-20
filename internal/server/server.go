@@ -56,6 +56,7 @@ func (s *Server) Run(ctx context.Context) error {
 			errCh <- err
 		}
 	}()
+
 	select {
 	case <-ctx.Done():
 		s.logger.Info("shutting down...")
@@ -80,6 +81,12 @@ func (s *Server) buildRouter() http.Handler {
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-Api-Key"},
 		MaxAge:         300,
 	}))
+
+	r.Get("/openapi.yaml", openAPISpecHandler())
+	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/docs/", http.StatusMovedPermanently)
+	})
+	r.Handle("/docs/*", http.StripPrefix("/docs/", docsFS()))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(auth.APIKeyMiddleware(s.cfg.Auth.APIKey, s.cfg.Auth.Enabled))

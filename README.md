@@ -27,6 +27,7 @@ make build
 ./bin/goradarr
 
 # Open http://localhost:7878
+# API docs at http://localhost:7878/docs/
 ```
 
 ## Configuration
@@ -111,6 +112,11 @@ GoRadarr/
 - [ ] Auto-updater
 - [x] Docker image
 
+## API Documentation
+
+- Swagger UI: `http://localhost:7878/docs/`
+- OpenAPI spec: `http://localhost:7878/openapi.yaml`
+
 ## Development
 
 ```bash
@@ -135,7 +141,7 @@ make release
 | Frontend | React 18, TypeScript, Vite, Tailwind, shadcn/ui |
 | Database | SQLite (default), PostgreSQL |
 | Config | Viper |
-| Testing | Go standard `testing` + testify |
+| Testing | Go standard `testing` + Vitest + Testing Library |
 
 ## License
 
