@@ -12,7 +12,7 @@ import type {
   SchemaOption,
 } from '../lib/types'
 
-const tabs = ['general', 'quality', 'indexers', 'clients', 'notifications', 'security'] as const
+const tabs = ['general', 'logging', 'quality', 'indexers', 'clients', 'notifications', 'security'] as const
 
 type Tab = (typeof tabs)[number]
 
@@ -32,6 +32,8 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [newApiKey, setNewApiKey] = useState<string | null>(null)
   const [apiKeyError, setApiKeyError] = useState<string | null>(null)
+  const [logTarget, setLogTarget] = useState<string>('')
+  const [testLogResult, setTestLogResult] = useState<string | null>(null)
 
   const hostConfig = useQuery<GeneralConfig>({ queryKey: ['host-config'], queryFn: () => api.get('/config/host').then((res) => res.data) })
   const qualityProfiles = useQuery<QualityProfile[]>({ queryKey: ['quality-profiles'], queryFn: () => api.get('/qualityprofile').then((res) => res.data) })
@@ -45,6 +47,17 @@ export default function Settings() {
 
   const saveGeneral = useMutation({
     mutationFn: (payload: Partial<GeneralConfig>) => api.put('/config/host', payload),
+  })
+
+  const saveLogging = useMutation({
+    mutationFn: (payload: Partial<GeneralConfig>) => api.put('/config/host', payload),
+    onSuccess: () => setTestLogResult(null),
+  })
+
+  const testLogs = useMutation({
+    mutationFn: () => api.post<{ message: string; target: string }>('/system/logs/test').then((r) => r.data),
+    onSuccess: (data) => setTestLogResult(`✅ ${data.message} → target: ${data.target}`),
+    onError: (err: Error) => setTestLogResult(`❌ ${err.message}`),
   })
 
   const regenerateKey = useMutation({
@@ -69,6 +82,21 @@ export default function Settings() {
     })
   }
 
+  function submitLogging(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    saveLogging.mutate({
+      logLevel: String(form.get('logLevel') ?? 'info'),
+      logTarget: String(form.get('logTarget') ?? 'stderr'),
+      logFile: String(form.get('logFile') ?? ''),
+      syslogAddress: String(form.get('syslogAddress') ?? ''),
+      syslogPort: Number(form.get('syslogPort') ?? 514),
+      syslogNetwork: String(form.get('syslogNetwork') ?? 'udp'),
+    })
+  }
+
+  const effectiveLogTarget = logTarget || hostConfig.data?.logTarget || 'stderr'
+
   return (
     <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
       <nav className="panel flex flex-row gap-2 overflow-x-auto p-3 lg:flex-col lg:overflow-visible">
@@ -91,6 +119,100 @@ export default function Settings() {
               </div>
               <div className="flex justify-end">
                 <button type="submit" className="btn-primary" disabled={saveGeneral.isPending}>Save host config</button>
+              </div>
+            </form>
+          </Section>
+        ) : null}
+
+        {activeTab === 'logging' ? (
+          <Section title="Logging" subtitle="Configure where GoRadarr sends structured JSON log output.">
+            <form className="space-y-5" onSubmit={submitLogging}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="text-sm text-gray-400">
+                  Log level
+                  <select name="logLevel" className="field mt-2" defaultValue={hostConfig.data?.logLevel ?? 'info'}>
+                    <option value="debug">debug</option>
+                    <option value="info">info</option>
+                    <option value="warn">warn</option>
+                    <option value="error">error</option>
+                  </select>
+                </label>
+                <label className="text-sm text-gray-400">
+                  Log target
+                  <select
+                    name="logTarget"
+                    className="field mt-2"
+                    value={effectiveLogTarget}
+                    onChange={(e) => setLogTarget(e.target.value)}
+                  >
+                    <option value="stderr">stderr (default)</option>
+                    <option value="stdout">stdout</option>
+                    <option value="file">file</option>
+                    <option value="syslog">syslog (remote)</option>
+                  </select>
+                </label>
+              </div>
+
+              {effectiveLogTarget === 'file' ? (
+                <label className="block text-sm text-gray-400">
+                  Log file path
+                  <input name="logFile" className="field mt-2" defaultValue={hostConfig.data?.logFile ?? ''} placeholder="/config/goradarr.log" />
+                </label>
+              ) : null}
+
+              {effectiveLogTarget === 'syslog' ? (
+                <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 space-y-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Remote syslog (RFC 3164)</p>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <label className="text-sm text-gray-400">
+                      Host / IP
+                      <input
+                        name="syslogAddress"
+                        className="field mt-2 font-mono"
+                        defaultValue={hostConfig.data?.syslogAddress ?? ''}
+                        placeholder="192.168.10.152"
+                      />
+                    </label>
+                    <label className="text-sm text-gray-400">
+                      Port
+                      <input
+                        name="syslogPort"
+                        className="field mt-2"
+                        type="number"
+                        defaultValue={hostConfig.data?.syslogPort ?? 514}
+                        placeholder="514"
+                      />
+                    </label>
+                    <label className="text-sm text-gray-400">
+                      Protocol
+                      <select name="syslogNetwork" className="field mt-2" defaultValue={hostConfig.data?.syslogNetwork ?? 'udp'}>
+                        <option value="udp">UDP</option>
+                        <option value="tcp">TCP</option>
+                        <option value="unix">Unix socket</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Each log entry is sent as a single structured JSON line inside the syslog message body.
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={testLogs.isPending}
+                    onClick={() => testLogs.mutate()}
+                  >
+                    {testLogs.isPending ? 'Sending…' : 'Send test logs'}
+                  </button>
+                  {testLogResult ? <span className="self-center text-sm text-gray-400">{testLogResult}</span> : null}
+                </div>
+                <button type="submit" className="btn-primary" disabled={saveLogging.isPending}>
+                  {saveLogging.isPending ? 'Saving…' : 'Save logging config'}
+                </button>
               </div>
             </form>
           </Section>

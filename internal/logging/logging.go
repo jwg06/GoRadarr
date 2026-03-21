@@ -8,22 +8,35 @@ import (
 	"strings"
 )
 
-// Setup creates a configured slog.Logger.
+// SyslogConfig carries remote syslog dial parameters.
+type SyslogConfig struct {
+	Address string // host or IP; empty = local syslog daemon
+	Port    int    // default 514
+	Network string // "udp" (default) | "tcp" | "unix"
+}
+
+// Setup creates a configured slog.Logger that writes to the requested target
+// and also feeds the in-process ring buffer for the /api/v1/log endpoint.
 //
 // target: "stderr" | "stdout" | "file" | "syslog"
 // level:  "debug" | "info" | "warn" | "error"
 // file:   path used when target == "file"
-func Setup(level, target, file string) *slog.Logger {
+func Setup(level, target, file string, sc SyslogConfig) *slog.Logger {
 	lvl := parseLevel(level)
 	opts := &slog.HandlerOptions{
 		Level:     lvl,
 		AddSource: lvl == slog.LevelDebug,
 	}
+	primary := buildPrimaryHandler(opts, target, file, sc)
+	ring := RingHandler(opts)
+	return slog.New(&teeHandler{primary: primary, ring: ring})
+}
 
+func buildPrimaryHandler(opts *slog.HandlerOptions, target, file string, sc SyslogConfig) slog.Handler {
 	switch strings.ToLower(target) {
 	case "syslog":
-		if l := setupSyslog(opts); l != nil {
-			return l
+		if l := setupSyslog(opts, sc); l != nil {
+			return l.Handler()
 		}
 		// syslog unavailable — fall through to stderr
 		fallthrough
@@ -32,15 +45,15 @@ func Setup(level, target, file string) *slog.Logger {
 			if err := os.MkdirAll(filepath.Dir(file), 0o755); err == nil {
 				f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 				if err == nil {
-					return slog.New(newMultiHandler(opts, f))
+					return newMultiHandler(opts, f)
 				}
 			}
 		}
 		fallthrough
 	case "stdout":
-		return slog.New(slog.NewTextHandler(os.Stdout, opts))
+		return slog.NewTextHandler(os.Stdout, opts)
 	default: // "stderr" and anything else
-		return slog.New(slog.NewTextHandler(os.Stderr, opts))
+		return slog.NewTextHandler(os.Stderr, opts)
 	}
 }
 

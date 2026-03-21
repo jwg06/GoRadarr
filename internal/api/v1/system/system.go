@@ -2,6 +2,7 @@ package system
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"runtime"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jwg06/goradarr/internal/config"
 	"github.com/jwg06/goradarr/internal/database"
+	"github.com/jwg06/goradarr/internal/logging"
 )
 
 var startTime = time.Now()
@@ -29,6 +31,7 @@ func RegisterRoutes(r chi.Router, cfg *config.Config, db *database.DB) {
 		r.Get("/backup", h.listBackups)
 		r.Post("/backup", h.createBackup)
 		r.Delete("/backup/{name}", h.deleteBackup)
+		r.Post("/logs/test", h.testLogs)
 	})
 	r.Route("/config", func(r chi.Router) {
 		r.Get("/host", h.getHostConfig)
@@ -179,6 +182,11 @@ func (h *handler) getHostConfig(w http.ResponseWriter, r *http.Request) {
 		"updateMechanism":       "builtIn",
 		"branch":                "main",
 		"logLevel":              h.cfg.LogLevel,
+		"logTarget":             h.cfg.LogTarget,
+		"logFile":               h.cfg.LogFile,
+		"syslogAddress":         h.cfg.SyslogAddress,
+		"syslogPort":            h.cfg.SyslogPort,
+		"syslogNetwork":         h.cfg.SyslogNetwork,
 		"consoleLogLevel":       "info",
 		"instanceName":          "GoRadarr",
 		"urlBase":               h.cfg.BaseURL,
@@ -193,7 +201,67 @@ func (h *handler) putHostConfig(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request body"})
 		return
 	}
+
+	// Apply each recognised field onto the live config pointer.
+	if v, ok := body["bindAddress"].(string); ok {
+		h.cfg.Host = v
+	}
+	if v, ok := body["port"].(float64); ok {
+		h.cfg.Port = int(v)
+	}
+	if v, ok := body["urlBase"].(string); ok {
+		h.cfg.BaseURL = v
+	}
+	if v, ok := body["logLevel"].(string); ok {
+		h.cfg.LogLevel = v
+	}
+	if v, ok := body["logTarget"].(string); ok {
+		h.cfg.LogTarget = v
+	}
+	if v, ok := body["logFile"].(string); ok {
+		h.cfg.LogFile = v
+	}
+	if v, ok := body["syslogAddress"].(string); ok {
+		h.cfg.SyslogAddress = v
+	}
+	if v, ok := body["syslogPort"].(float64); ok {
+		h.cfg.SyslogPort = int(v)
+	}
+	if v, ok := body["syslogNetwork"].(string); ok {
+		h.cfg.SyslogNetwork = v
+	}
+
+	// Reinitialise the global logger with the new settings.
+	slog.SetDefault(logging.Setup(h.cfg.LogLevel, h.cfg.LogTarget, h.cfg.LogFile, logging.SyslogConfig{
+		Address: h.cfg.SyslogAddress,
+		Port:    h.cfg.SyslogPort,
+		Network: h.cfg.SyslogNetwork,
+	}))
+	slog.Info("logging reconfigured", "target", h.cfg.LogTarget, "level", h.cfg.LogLevel,
+		"syslog_address", h.cfg.SyslogAddress, "syslog_port", h.cfg.SyslogPort)
+
+	// Persist changes to config.yaml so they survive a restart.
+	if err := config.SaveToFile(h.cfg); err != nil {
+		slog.Warn("could not persist config to disk", "error", err)
+	}
+
 	h.getHostConfig(w, r)
+}
+
+// testLogs fires one message at every log level so you can verify syslog delivery.
+func (h *handler) testLogs(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("GoRadarr test log: DEBUG", "target", h.cfg.LogTarget, "syslog_address", h.cfg.SyslogAddress)
+	slog.Info("GoRadarr test log: INFO", "target", h.cfg.LogTarget, "syslog_address", h.cfg.SyslogAddress)
+	slog.Warn("GoRadarr test log: WARN", "target", h.cfg.LogTarget, "syslog_address", h.cfg.SyslogAddress)
+	slog.Error("GoRadarr test log: ERROR", "target", h.cfg.LogTarget, "syslog_address", h.cfg.SyslogAddress)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message":       "Test log messages sent at all levels",
+		"target":        h.cfg.LogTarget,
+		"syslogAddress": h.cfg.SyslogAddress,
+		"syslogPort":    h.cfg.SyslogPort,
+		"syslogNetwork": h.cfg.SyslogNetwork,
+		"levels":        []string{"debug", "info", "warn", "error"},
+	})
 }
 
 func (h *handler) getUIConfig(w http.ResponseWriter, r *http.Request) {

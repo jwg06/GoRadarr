@@ -132,6 +132,11 @@ export interface GeneralConfig {
   authenticationMethod: string
   analyticsEnabled: boolean
   logLevel: string
+  logTarget: string      // stderr | stdout | file | syslog
+  logFile: string
+  syslogAddress: string
+  syslogPort: number
+  syslogNetwork: string  // udp | tcp | unix
   branch: string
   updateAutomatically: boolean
   updateMechanism: string

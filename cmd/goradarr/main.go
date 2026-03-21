@@ -33,7 +33,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := logging.Setup(cfg.LogLevel, cfg.LogTarget, cfg.LogFile)
+	logger := logging.Setup(cfg.LogLevel, cfg.LogTarget, cfg.LogFile, logging.SyslogConfig{
+		Address: cfg.SyslogAddress,
+		Port:    cfg.SyslogPort,
+		Network: cfg.SyslogNetwork,
+	})
 	slog.SetDefault(logger)
 
 	db, err := database.Open(cfg.Database)

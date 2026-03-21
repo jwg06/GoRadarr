@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/jwg06/goradarr/internal/api/v1/activity"
 	"github.com/jwg06/goradarr/internal/api/v1/calendar"
 	"github.com/jwg06/goradarr/internal/api/v1/command"
 	"github.com/jwg06/goradarr/internal/api/v1/downloadclients"
@@ -111,6 +112,7 @@ func (s *Server) buildRouter() http.Handler {
 		tags.RegisterRoutes(r, s.db)
 		system.RegisterRoutes(r, s.cfg, s.db)
 		command.RegisterRoutes(r, s.db, s.cfg)
+		activity.RegisterRoutes(r, s.db)
 		r.Get("/feed", s.broker.ServeHTTP)
 	})
 

@@ -8,14 +8,14 @@ import (
 )
 
 func TestSetupStderr(t *testing.T) {
-	l := Setup("info", "stderr", "")
+	l := Setup("info", "stderr", "", SyslogConfig{})
 	if l == nil {
 		t.Fatal("expected non-nil logger")
 	}
 }
 
 func TestSetupStdout(t *testing.T) {
-	l := Setup("debug", "stdout", "")
+	l := Setup("debug", "stdout", "", SyslogConfig{})
 	if l == nil {
 		t.Fatal("expected non-nil logger")
 	}
@@ -23,11 +23,19 @@ func TestSetupStdout(t *testing.T) {
 
 func TestSetupFile(t *testing.T) {
 	tmp := t.TempDir() + "/test.log"
-	l := Setup("info", "file", tmp)
+	l := Setup("info", "file", tmp, SyslogConfig{})
 	if l == nil {
 		t.Fatal("expected non-nil logger")
 	}
 	l.Info("hello from file logger")
+}
+
+func TestSetupSyslogBadAddress(t *testing.T) {
+	// An unreachable address should fall back gracefully (no panic).
+	l := Setup("info", "syslog", "", SyslogConfig{Address: "127.0.0.1", Port: 1, Network: "udp"})
+	if l == nil {
+		t.Fatal("expected non-nil fallback logger when syslog is unreachable")
+	}
 }
 
 func TestParseLevel(t *testing.T) {

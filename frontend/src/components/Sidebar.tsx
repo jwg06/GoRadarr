@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { CalendarDays, Clock3, Film, HardDriveDownload, PlusCircle, Server, Settings, Telescope } from 'lucide-react'
+import { Activity, CalendarDays, Clock3, Film, HardDriveDownload, PlusCircle, Server, Settings, Telescope } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useLiveFeedStore } from '../stores/liveFeed'
 
@@ -9,6 +9,7 @@ const links = [
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/history', icon: Clock3, label: 'History' },
   { to: '/queue', icon: HardDriveDownload, label: 'Queue' },
+  { to: '/activity', icon: Activity, label: 'Activity' },
   { to: '/wanted', icon: Telescope, label: 'Wanted' },
   { to: '/settings', icon: Settings, label: 'Settings' },
   { to: '/system/status', icon: Server, label: 'System' },

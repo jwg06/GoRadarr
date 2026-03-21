@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 interface AuthState {
   token: string | null
@@ -8,6 +8,14 @@ interface AuthState {
   login: (token: string, username: string) => void
   logout: () => void
 }
+
+// Use a lazy storage getter so window.localStorage is accessed at call-time,
+// not captured once at store-creation time (avoids issues in test environments).
+const lazyStorage = createJSONStorage(() => ({
+  getItem: (key: string) => window.localStorage.getItem(key),
+  setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
+  removeItem: (key: string) => window.localStorage.removeItem(key),
+}))
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -20,6 +28,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'goradarr-auth',
+      storage: lazyStorage,
     },
   ),
 )

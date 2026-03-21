@@ -31,7 +31,7 @@ export default function Login() {
       if (axios.isAxiosError(err)) {
         setError((err.response?.data as { message?: string })?.message ?? 'Login failed')
       } else {
-        console.error("CAUGHT ERROR:", err, err instanceof Error ? err.message : String(err)); setError('Login failed')
+        setError('Login failed')
       }
     } finally {
       setLoading(false)

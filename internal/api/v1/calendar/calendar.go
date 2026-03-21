@@ -32,9 +32,9 @@ func (h *handler) calendar(w http.ResponseWriter, r *http.Request) {
 		end = t
 	}
 
-	query := `SELECT id, title, COALESCE(sort_title,\'\'), tmdb_id, COALESCE(imdb_id,\'\'),
-		COALESCE(overview,\'\'), status, year, runtime, COALESCE(studio,\'\'),
-		quality_profile_id, COALESCE(root_folder_path,\'\'), COALESCE(path,\'\'),
+	query := `SELECT id, title, COALESCE(sort_title,''), tmdb_id, COALESCE(imdb_id,''),
+		COALESCE(overview,''), status, year, runtime, COALESCE(studio,''),
+		quality_profile_id, COALESCE(root_folder_path,''), COALESCE(path,''),
 		monitored, minimum_availability, has_file, added,
 		in_cinemas, physical_release, digital_release
 		FROM movies WHERE (
