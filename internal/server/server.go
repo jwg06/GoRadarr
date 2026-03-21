@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/jwg06/goradarr/internal/api/v1/activity"
 	"github.com/jwg06/goradarr/internal/api/v1/calendar"
@@ -28,6 +28,7 @@ import (
 	"github.com/jwg06/goradarr/internal/database"
 	"github.com/jwg06/goradarr/internal/events"
 	"github.com/jwg06/goradarr/internal/metrics"
+	apimiddleware "github.com/jwg06/goradarr/internal/middleware"
 )
 
 type Server struct {
@@ -53,6 +54,10 @@ func New(cfg *config.Config, db *database.DB, logger *slog.Logger) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	// Start notification dispatcher in the background.
+	dispatcher := notifications.NewDispatcher(s.db, s.broker, s.logger)
+	go dispatcher.Start(ctx)
+
 	errCh := make(chan error, 1)
 	go func() {
 		s.logger.Info("GoRadarr starting", "addr", s.http.Addr)
@@ -73,17 +78,20 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) buildRouter() http.Handler {
+	// 300 req/min per IP, burst 20 — generous for UI use, protects against abuse.
+	rateLimiter := apimiddleware.NewRateLimiter(300, 20)
+
 	r := chi.NewRouter()
-	r.Use(middleware.RealIP)
-	r.Use(middleware.RequestID)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Compress(5))
+	r.Use(chimiddleware.RealIP)
+	r.Use(chimiddleware.RequestID)
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
+	r.Use(chimiddleware.Compress(5))
 	r.Use(metrics.RequestMiddleware)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-Api-Key"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-Api-Key", "X-Requested-With"},
 		MaxAge:         300,
 	}))
 
@@ -99,6 +107,12 @@ func (s *Server) buildRouter() http.Handler {
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(rateLimiter.Middleware)
+		if s.cfg.Auth.Enabled {
+			// CSRF protection is only meaningful when auth is on — prevents
+			// cross-site requests from hijacking authenticated sessions.
+			r.Use(apimiddleware.CSRFGuard)
+		}
 		r.Use(auth.APIKeyMiddleware(s.cfg.Auth.APIKey, s.cfg.Auth.Enabled))
 		movies.RegisterRoutes(r, s.db, s.cfg)
 		profiles.RegisterRoutes(r, s.db)

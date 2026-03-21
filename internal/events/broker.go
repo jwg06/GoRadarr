@@ -69,6 +69,26 @@ func (b *Broker) Publish(evt Event) {
 	}
 }
 
+// Subscribe registers a channel that receives all published events.
+// The caller must call Unsubscribe when done to avoid a resource leak.
+func (b *Broker) Subscribe() chan Event {
+	ch := make(chan Event, 64)
+	b.mu.Lock()
+	b.clients[ch] = struct{}{}
+	b.mu.Unlock()
+	return ch
+}
+
+// Unsubscribe removes a subscriber channel and drains it.
+func (b *Broker) Unsubscribe(ch chan Event) {
+	b.mu.Lock()
+	delete(b.clients, ch)
+	b.mu.Unlock()
+	for len(ch) > 0 {
+		<-ch
+	}
+}
+
 func (b *Broker) ClientCount() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
