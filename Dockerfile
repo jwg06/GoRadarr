@@ -6,9 +6,8 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: Build Go binary
-FROM golang:1.22-alpine AS go-builder
-RUN apk add --no-cache git ca-certificates tzdata
+# Stage 2: Build Go binary (Debian-based — git/ca-certs/tzdata pre-installed, no apk needed)
+FROM golang:1.26 AS go-builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
